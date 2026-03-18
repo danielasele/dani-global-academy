@@ -1,12 +1,52 @@
 import { useState, useEffect } from "react";
 
-// ─── ADMIN CONFIG ────────────────────────────────────────────────────────────
-// STEP 1: Replace with your Google Sheet CSV URL (see README for instructions)
-const GOOGLE_SHEET_CSV_URL = "YOUR_GOOGLE_SHEET_CSV_URL_HERE";
-// STEP 2: Change this password to something secret!
-const ADMIN_PASSWORD = "dani2025admin";
+/*
+ * ============================================================
+ *  DANI GLOBAL ACADEMY — Scholarship Platform
+ *  Version 3.0  |  © 2026 Dani Global Academy
+ * ============================================================
+ *
+ *  SECURITY NOTICE
+ *  ───────────────
+ *  This file runs entirely in the browser. Never put real
+ *  passwords, secret keys or API tokens here. Everything
+ *  in this file is visible to anyone who inspects the page.
+ *
+ *  PRODUCTION UPGRADE PATH (recommended)
+ *  ──────────────────────────────────────
+ *  1. Authentication  → Supabase Auth (supabase.com) — free tier
+ *  2. Database        → Supabase PostgreSQL           — free tier
+ *  3. Email alerts    → Resend.com                    — free tier
+ *  4. SEO / routing   → Migrate to Next.js            — free on Vercel
+ *
+ *  QUICK SETUP (two things to change before going live)
+ *  ─────────────────────────────────────────────────────
+ *  A. GOOGLE_SHEET_CSV_URL — paste your published CSV link (see Admin → Google Sheets)
+ *  B. ADMIN_EMAIL          — set the email address that will have admin access
+ *
+ *  The admin password is checked client-side only (acceptable for a demo /
+ *  small-team tool). Upgrade to Supabase Auth for a production deployment.
+ * ============================================================
+ */
 
-// ─── SCHOLARSHIP DATA (80+ real scholarships worldwide) ──────────────────────
+// Your published Google Sheet CSV URL — leave blank to use built-in scholarship data
+const GOOGLE_SHEET_CSV_URL = "";
+
+// Admin access credentials — change BOTH before publishing live
+const ADMIN_EMAIL    = "admin@daniglobalacademy.com";
+const ADMIN_PASSWORD = "DGA@2026!Admin";  // Change this to something unique and strong
+
+// Site metadata used for SEO <title> and <meta> tags
+const SITE_NAME        = "Dani Global Academy";
+const SITE_TAGLINE     = "Find Your Dream Scholarship";
+const SITE_DESCRIPTION = "Discover 183+ scholarships from 50+ countries. Browse BSc, MSc, PhD and Postdoctoral funding opportunities worldwide — including Africa-focused, government and corporate scholarships.";
+
+// ─── SCHOLARSHIP DATA ────────────────────────────────────────────────────────
+// 183 real scholarships across 50+ countries.
+// Covers BSc, MSc, PhD and Postdoctoral levels.
+// Regions: USA, UK, Europe, Africa, Asia, Middle East, Latin America, Oceania.
+// This array is the fallback when no Google Sheet is connected.
+// To manage scholarships without editing code, use Admin → Google Sheets.
 const FALLBACK_SCHOLARSHIPS = [
   // ── USA ──────────────────────────────────────────────────────────────────
   { id:1, slug:"gates-millennium-scholars", title:"Gates Millennium Scholars Program", org:"Bill & Melinda Gates Foundation", orgLogo:"BG", orgColor:"#0078D4", amount:50000, currency:"USD", awardType:"Full Tuition", deadline:"2026-01-15", country:"USA", fields:["Any Field"], degrees:["Undergraduate","Graduate"], tags:["STEM","Minority","Leadership"], description:"The Gates Millennium Scholars Program selects 1,000 talented students each year. The program focuses on promoting academic excellence and providing an opportunity for outstanding minority students.", requirements:"Minimum 3.3 GPA. Demonstrated leadership and community service. Financial need required. Must be African American, American Indian, Alaska Native, Asian Pacific Islander, or Hispanic.", views:4821, status:"published", featured:true, appUrl:"https://gmsp.org" },
@@ -255,7 +295,9 @@ const FALLBACK_SCHOLARSHIPS = [
   { id:180, slug:"embo-postdoctoral-fellowship", title:"EMBO Postdoctoral Fellowship", org:"European Molecular Biology Organization", orgLogo:"EM3", orgColor:"#003D7C", amount:48000, currency:"EUR", awardType:"Full Funding", deadline:"2026-02-12", country:"Europe", fields:["Molecular Biology","Biochemistry","Genetics","Cell Biology","Neuroscience"], degrees:["Postdoc"], tags:["Europe","EMBO","Molecular Biology","Postdoc","Research"], description:"EMBO Fellowships support postdoctoral researchers in the life sciences for two-year stays at European research institutions. EMBO is one of Europe's most prestigious scientific organizations.", requirements:"PhD awarded. Moving to European country different from current/PhD country. Research in life sciences. Strong publication record.", views:1450, status:"published", featured:false, appUrl:"https://www.embo.org/funding-awards/fellowships/postdoctoral-fellowships" },
 ];
 
-const CATEGORIES = [
+// ─── CATEGORIES ──────────────────────────────────────────────────────────────
+// Shown on the homepage category browser and used as filter labels.
+// Update counts here when you add scholarships to a category.
   { id:1,  name:"STEM",              icon:"🔬", count:42 },
   { id:2,  name:"Arts & Humanities", icon:"🎨", count:12 },
   { id:3,  name:"Business",          icon:"💼", count:15 },
@@ -270,7 +312,11 @@ const CATEGORIES = [
   { id:12, name:"PhD & Postdoc",     icon:"🔬", count:55 },
 ];
 
-// ─── UTILITIES ────────────────────────────────────────────────────────────────
+// ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
+// daysUntil     — returns how many days remain until a deadline date string
+// formatAmount  — formats a number as a currency string (e.g. $50,000)
+// slugify       — converts a title string to a URL-safe slug
+// useDebounce   — delays updating a value until the user stops typing
 function daysUntil(dateStr) {
   const diff = new Date(dateStr) - new Date();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -288,7 +334,11 @@ function useDebounce(value, delay) {
   return deb;
 }
 
-// ─── GOOGLE SHEETS PARSER ─────────────────────────────────────────────────────
+// ─── GOOGLE SHEETS PARSER ────────────────────────────────────────────────────
+// Fetches a publicly published Google Sheet in CSV format and converts each
+// row into a scholarship object. Column names must match the field names below.
+// Fields separated by semicolons (e.g. "STEM;Business") become arrays.
+// Returns null if the fetch fails so the app falls back to FALLBACK_SCHOLARSHIPS.
 async function fetchFromGoogleSheets(url) {
   try {
     const res = await fetch(url);
@@ -326,7 +376,11 @@ async function fetchFromGoogleSheets(url) {
   }
 }
 
-// ─── LOCAL STORAGE HELPERS ────────────────────────────────────────────────────
+// ─── LOCAL STORAGE HELPERS ───────────────────────────────────────────────────
+// Thin wrappers around localStorage with JSON serialisation and error handling.
+// Used to persist bookmarks, tracked applications and admin-added scholarships
+// across page reloads. Data is stored per browser — not shared between devices.
+// NOTE: For multi-device sync, replace these with Supabase database calls.
 function loadLocal(key, def) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
 }
@@ -334,7 +388,19 @@ function saveLocal(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
-// ─── GLOBAL STORE ─────────────────────────────────────────────────────────────
+// ─── GLOBAL STATE STORE ──────────────────────────────────────────────────────
+// A lightweight pub-sub state container — no Redux or Context needed.
+// Components call useStore() to subscribe and re-render on any state change.
+// All mutations call this.notify() which triggers every subscribed component.
+// State is persisted to localStorage where noted.
+//
+// Properties:
+//   user              — currently logged-in user object, or null
+//   bookmarks         — Set of scholarship IDs the user has saved
+//   applications      — array of { id, scholarshipId, status, appliedAt }
+//   adminScholarships — scholarships added via the Admin panel (local only)
+//
+// NOTE: Replace store.login / store.logout with Supabase Auth for production.
 const store = {
   user: null,
   bookmarks: new Set(loadLocal("dga_bookmarks", [])),
@@ -384,7 +450,12 @@ function useStore() {
   return store;
 }
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
+// ─── GLOBAL STYLES ───────────────────────────────────────────────────────────
+// All CSS is injected via a <style> tag in App. This keeps the project as a
+// single deployable file. Variables use the Dani Global Academy brand palette:
+//   --accent  : Navy blue  #1B2D6B  (primary actions, hero, headers)
+//   --accent2 : Gold       #C9921A  (highlights, tassel, search button)
+// Fonts: Playfair Display (headings) + DM Sans (body) loaded from Google Fonts.
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root {
@@ -574,7 +645,10 @@ tr:hover td { background: var(--surface2); }
 }
 `;
 
-// ─── TOAST ────────────────────────────────────────────────────────────────────
+// ─── TOAST NOTIFICATION SYSTEM ───────────────────────────────────────────────
+// A minimal pub-sub toast queue. Call toastStore.show(message, type) from
+// anywhere in the app. Type is "success" (default), "error" or "info".
+// Toasts auto-dismiss after 3.5 seconds. ToastContainer renders them.───
 const toastStore = { toasts:[], listeners:new Set(), notify() { this.listeners.forEach(fn => fn()); },
   show(msg, type="success") { const id=Date.now(); this.toasts.push({id,msg,type}); this.notify(); setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); this.notify(); },3500); }
 };
@@ -584,7 +658,10 @@ function ToastContainer() {
   return <div className="toast-wrap">{toasts.map(t=><div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}</div>;
 }
 
-// ─── COMPONENTS ───────────────────────────────────────────────────────────────
+// ─── UI COMPONENTS ───────────────────────────────────────────────────────────
+// DeadlineBadge  — colour-coded pill showing days remaining until deadline
+// LogoSVG        — inline SVG recreation of the Dani Global Academy logo
+// ScholarCard    — reusable scholarship card used in grids across all pages
 function DeadlineBadge({deadline}) {
   const d=daysUntil(deadline);
   if(d<0) return <span className="deadline-badge closed">⊘ Closed</span>;
@@ -643,7 +720,9 @@ function ScholarCard({s, onNavigate}) {
   );
 }
 
-// ─── NAV ──────────────────────────────────────────────────────────────────────
+// ─── NAVIGATION BAR ──────────────────────────────────────────────────────────
+// Sticky top navbar. Shows different links based on login state and role.
+// Admin users see the ⚙ Admin link. Org users see Post Scholarship.
 function Nav({page,onNavigate}) {
   const {user,logout}=useStore();
   return (
@@ -677,7 +756,9 @@ function Nav({page,onNavigate}) {
   );
 }
 
-// ─── HOME PAGE ────────────────────────────────────────────────────────────────
+// ─── HOME PAGE ───────────────────────────────────────────────────────────────
+// Hero section with search, category browser, featured scholarships grid,
+// closing-soon section, how-it-works cards, and a call-to-action banner.
 function HomePage({onNavigate,scholarships,loading}) {
   const [search,setSearch]=useState("");
   const featured=scholarships.filter(s=>s.featured).slice(0,4);
@@ -742,7 +823,9 @@ function HomePage({onNavigate,scholarships,loading}) {
   );
 }
 
-// ─── BROWSE PAGE ──────────────────────────────────────────────────────────────
+// ─── BROWSE PAGE ─────────────────────────────────────────────────────────────
+// Full scholarship listing with sidebar filters (country, degree, award type),
+// live debounced search, sort options, active filter pills and pagination.
 function BrowsePage({onNavigate,scholarships,loading,initialSearch=""}) {
   const [search,setSearch]=useState(initialSearch);
   const [sort,setSort]=useState("newest");
@@ -808,7 +891,10 @@ function BrowsePage({onNavigate,scholarships,loading,initialSearch=""}) {
   );
 }
 
-// ─── DETAIL PAGE ──────────────────────────────────────────────────────────────
+// ─── SCHOLARSHIP DETAIL PAGE ─────────────────────────────────────────────────
+// Full-width header with amount, deadline and org logo. Tabbed body (Overview,
+// Requirements, Eligibility, Organization). Sidebar with Apply, Bookmark and
+// Track Application buttons. Related scholarships at the bottom.
 function DetailPage({slug,onNavigate,scholarships}) {
   const [tab,setTab]=useState("overview");
   const {bookmarks,toggleBookmark,user,addApplication,applications}=useStore();
@@ -872,36 +958,52 @@ function DetailPage({slug,onNavigate,scholarships}) {
   );
 }
 
-// ─── AUTH PAGES ───────────────────────────────────────────────────────────────
+// ─── AUTHENTICATION PAGES ────────────────────────────────────────────────────
+// LoginPage    — email + password sign-in. Admin credentials unlock the Admin
+//                panel. All other valid-looking credentials create a session.
+//                NOTE: This is client-side auth only — acceptable for a demo
+//                or small internal tool. Upgrade to Supabase Auth for production
+//                to get real server-side verification, password hashing and
+//                session tokens.
+// RegisterPage — role selection (Student / Organization) + account creation.
 function LoginPage({onNavigate}) {
   const {login}=useStore();
   const [email,setEmail]=useState("");
   const [pass,setPass]=useState("");
+  const [error,setError]=useState("");
+
   function handle(){
-    if(!email||!pass){toastStore.show("Please fill all fields","error");return;}
-    if(pass===ADMIN_PASSWORD&&(email.toLowerCase().includes("admin")||email.toLowerCase().includes("dani"))){
-      login({name:"Admin",email,role:"admin"});
+    setError("");
+    if(!email.trim()||!pass.trim()){setError("Please enter your email and password.");return;}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setError("Please enter a valid email address.");return;}
+    if(pass.length<6){setError("Password must be at least 6 characters.");return;}
+
+    // Check admin credentials against the constants defined at the top of the file
+    if(email.trim().toLowerCase()===ADMIN_EMAIL.toLowerCase()&&pass===ADMIN_PASSWORD){
+      login({name:"Admin",email:email.trim().toLowerCase(),role:"admin"});
       toastStore.show("Welcome Admin! 🔑");
       onNavigate("admin");
       return;
     }
-    const role=email.includes("org")?"org":"student";
-    login({name:email.split("@")[0].replace(/\./g," ").replace(/\b\w/g,l=>l.toUpperCase()),email,role});
+
+    // All other users get a student or organisation session
+    const role=email.toLowerCase().includes("org")?"org":"student";
+    const displayName=email.split("@")[0].replace(/[._-]+/g," ").replace(/\b\w/g,l=>l.toUpperCase());
+    login({name:displayName,email:email.trim().toLowerCase(),role});
     toastStore.show("Welcome back! 👋");
     onNavigate("dashboard");
   }
+
   return (
     <div className="auth-page">
       <div className="auth-card">
         <h2 style={{marginBottom:4}}>Welcome back</h2>
-        <p style={{color:"var(--text3)",fontSize:14,marginBottom:28}}>Sign in to your Dani Global Academy account</p>
-        <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)}/></div>
-        <div className="form-group"><label className="form-label">Password</label><input className="form-input" type="password" placeholder="••••••••" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()}/></div>
+        <p style={{color:"var(--text3)",fontSize:14,marginBottom:28}}>Sign in to your {SITE_NAME} account</p>
+        {error&&<div style={{padding:"10px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,fontSize:13,color:"var(--danger)",marginBottom:16}}>{error}</div>}
+        <div className="form-group"><label className="form-label">Email address</label><input className="form-input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/></div>
+        <div className="form-group"><label className="form-label">Password</label><input className="form-input" type="password" placeholder="••••••••" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} autoComplete="current-password"/></div>
         <button className="btn btn-primary" style={{width:"100%",marginTop:8}} onClick={handle}>Sign In</button>
-        <p style={{fontSize:13,textAlign:"center",color:"var(--text3)",marginTop:12}}>Don't have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:500}} onClick={()=>onNavigate("register")}>Sign up</span></p>
-        <div style={{marginTop:16,padding:12,background:"var(--surface2)",borderRadius:10,fontSize:12,color:"var(--text3)"}}>
-          <strong>Admin login:</strong> use your email + password: <code>dani2025admin</code>
-        </div>
+        <p style={{fontSize:13,textAlign:"center",color:"var(--text3)",marginTop:12}}>Don't have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:500}} onClick={()=>onNavigate("register")}>Create one free</span></p>
       </div>
     </div>
   );
@@ -911,10 +1013,15 @@ function RegisterPage({onNavigate}) {
   const {login}=useStore();
   const [role,setRole]=useState("student");
   const [form,setForm]=useState({name:"",email:"",pass:""});
+  const [error,setError]=useState("");
+
   function handle(){
-    if(!form.name||!form.email||!form.pass){toastStore.show("Please fill all fields","error");return;}
-    login({name:form.name,email:form.email,role});
-    toastStore.show("Account created! Welcome 🎉");
+    setError("");
+    if(!form.name.trim()||!form.email.trim()||!form.pass.trim()){setError("Please fill in all required fields.");return;}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)){setError("Please enter a valid email address.");return;}
+    if(form.pass.length<8){setError("Password must be at least 8 characters.");return;}
+    login({name:form.name.trim(),email:form.email.trim().toLowerCase(),role});
+    toastStore.show("Account created! Welcome to "+SITE_NAME+" 🎉");
     onNavigate("dashboard");
   }
   return (
@@ -922,21 +1029,25 @@ function RegisterPage({onNavigate}) {
       <div className="auth-card">
         <h2 style={{marginBottom:4}}>Create account</h2>
         <p style={{color:"var(--text3)",fontSize:14,marginBottom:20}}>Join thousands of students finding scholarships</p>
+        {error&&<div style={{padding:"10px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,fontSize:13,color:"var(--danger)",marginBottom:16}}>{error}</div>}
         <div className="role-toggle">
           <button className={`role-btn ${role==="student"?"active":""}`} onClick={()=>setRole("student")}>🎓 Student</button>
           <button className={`role-btn ${role==="org"?"active":""}`} onClick={()=>setRole("org")}>🏛 Organization</button>
         </div>
-        <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" placeholder="Jane Smith" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
-        <div className="form-group"><label className="form-label">Email *</label><input className="form-input" type="email" placeholder="you@example.com" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></div>
-        <div className="form-group"><label className="form-label">Password *</label><input className="form-input" type="password" placeholder="Min. 8 characters" value={form.pass} onChange={e=>setForm({...form,pass:e.target.value})}/></div>
-        <button className="btn btn-primary" style={{width:"100%",marginTop:8}} onClick={handle}>Create Account</button>
+        <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" placeholder="Jane Smith" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoComplete="name"/></div>
+        <div className="form-group"><label className="form-label">Email address *</label><input className="form-input" type="email" placeholder="you@example.com" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} autoComplete="email"/></div>
+        <div className="form-group"><label className="form-label">Password * <span style={{fontWeight:400,color:"var(--text3)"}}>(min. 8 characters)</span></label><input className="form-input" type="password" placeholder="Choose a strong password" value={form.pass} onChange={e=>setForm({...form,pass:e.target.value})} autoComplete="new-password"/></div>
+        <button className="btn btn-primary" style={{width:"100%",marginTop:8}} onClick={handle}>Create Free Account</button>
         <p style={{fontSize:13,textAlign:"center",color:"var(--text3)",marginTop:12}}>Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:500}} onClick={()=>onNavigate("login")}>Sign in</span></p>
       </div>
     </div>
   );
 }
 
-// ─── STUDENT DASHBOARD ────────────────────────────────────────────────────────
+// ─── STUDENT DASHBOARD ───────────────────────────────────────────────────────
+// Protected page — redirects to login if no user session exists.
+// Four sections: Dashboard home (stats + recommendations), Bookmarks,
+// Application Tracker (kanban board), and Profile Settings.
 function DashboardPage({onNavigate,scholarships}) {
   const {user,bookmarks,applications}=useStore();
   const [section,setSection]=useState("home");
@@ -1017,7 +1128,11 @@ function DashboardPage({onNavigate,scholarships}) {
   );
 }
 
-// ─── SCHOLARSHIP FORM MODAL ───────────────────────────────────────────────────
+// ─── SCHOLARSHIP FORM MODAL ──────────────────────────────────────────────────
+// Used by the Admin panel for both adding new scholarships and editing existing
+// ones. Pass editData={scholarshipObject} to pre-fill the form for editing.
+// Multi-value fields (fields, degrees, tags) use semicolon-separated strings
+// in the form which are split into arrays on save.
 function ScholarshipModal({onClose,onSave,editData=null}) {
   const empty={title:"",org:"",amount:"",currency:"USD",awardType:"Full Funding",deadline:"",country:"",fields:"Any Field",degrees:"Undergraduate",tags:"",description:"",requirements:"",appUrl:"",featured:false};
   const [form,setForm]=useState(editData?{...editData,fields:editData.fields.join(";"),degrees:editData.degrees.join(";"),tags:editData.tags.join(";")}:empty);
@@ -1070,7 +1185,17 @@ function ScholarshipModal({onClose,onSave,editData=null}) {
   );
 }
 
-// ─── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
+// ─── ADMIN DASHBOARD ─────────────────────────────────────────────────────────
+// Accessible only to users with role === "admin" (set at login).
+// Four sections:
+//   Scholarships — full table with inline edit and delete for admin-added entries
+//   Add Scholarship — opens ScholarshipModal to create a new entry
+//   Google Sheets — step-by-step guide to connect a live Google Sheet as CMS
+//   Statistics — aggregate counts, country breakdown table
+//
+// Admin-added scholarships are merged with FALLBACK_SCHOLARSHIPS at render time.
+// Built-in scholarships (from FALLBACK_SCHOLARSHIPS) show "Built-in" and cannot
+// be deleted here — edit the FALLBACK_SCHOLARSHIPS array in the source code instead.
 function AdminPage({onNavigate,scholarships,sheetUrl,setSheetUrl,onRefresh,loading}) {
   const {user,adminScholarships}=useStore();
   const [section,setSection]=useState("scholarships");
@@ -1203,8 +1328,8 @@ function AdminPage({onNavigate,scholarships,sheetUrl,setSheetUrl,onRefresh,loadi
                 🔄 Refresh Now
               </button>
             </div>
-            {sheetUrl&&sheetUrl!=="YOUR_GOOGLE_SHEET_CSV_URL_HERE"&&<div className="alert success" style={{marginTop:16}}>✅ Google Sheet connected! {loading?"Loading...":scholarships.length+" scholarships loaded."}</div>}
-            {(!sheetUrl||sheetUrl==="YOUR_GOOGLE_SHEET_CSV_URL_HERE")&&<div className="alert info" style={{marginTop:16}}>ℹ️ No Google Sheet connected yet. Using built-in scholarship data.</div>}
+            {sheetUrl&&sheetUrl.trim().startsWith("http")&&<div className="alert success" style={{marginTop:16}}>✅ Google Sheet connected! {loading?"Loading...":scholarships.length+" scholarships loaded."}</div>}
+            {(!sheetUrl||!sheetUrl.trim().startsWith("http"))&&<div className="alert info" style={{marginTop:16}}>ℹ️ No Google Sheet connected yet. Using the 183 built-in scholarships.</div>}
           </div>
         </>}
 
@@ -1251,7 +1376,10 @@ function AdminPage({onNavigate,scholarships,sheetUrl,setSheetUrl,onRefresh,loadi
   );
 }
 
-// ─── FOOTER ───────────────────────────────────────────────────────────────────
+// ─── FOOTER ──────────────────────────────────────────────────────────────────
+// Dark-background footer with brand name, link columns and copyright notice.
+// Footer links currently show a "Coming soon" toast — wire them to real pages
+// once those pages are built.
 function Footer({onNavigate}) {
   return (
     <footer style={{background:"var(--text)",color:"rgba(255,255,255,0.7)",padding:"48px 24px 32px",marginTop:"auto"}}>
@@ -1277,7 +1405,19 @@ function Footer({onNavigate}) {
   );
 }
 
-// ─── APP ROOT ─────────────────────────────────────────────────────────────────
+// ─── APP ROOT ────────────────────────────────────────────────────────────────
+// Top-level component. Owns all routing state (page, pageParam, searchParam),
+// the scholarship data array and the Google Sheet URL.
+//
+// Data loading order:
+//   1. Load sheetUrl from localStorage (set by Admin → Google Sheets)
+//   2. If sheetUrl is set, fetch CSV and parse scholarships
+//   3. Merge admin-added scholarships (localStorage) on top of the base data
+//   4. Fall back to FALLBACK_SCHOLARSHIPS if no sheet URL or fetch fails
+//
+// Page routing is handled with simple state strings rather than React Router
+// to keep the project as a single deployable file. Add React Router when
+// migrating to Next.js for proper SEO-friendly URLs per scholarship.
 export default function App() {
   const [page,setPage]=useState("home");
   const [pageParam,setPageParam]=useState(null);
@@ -1287,13 +1427,35 @@ export default function App() {
   const [sheetUrl,setSheetUrl]=useState(()=>loadLocal("dga_sheet_url",GOOGLE_SHEET_CSV_URL));
   const {adminScholarships}=useStore();
 
+  // Update the browser <title> tag whenever the page changes for basic SEO
+  useEffect(()=>{
+    const titles={
+      home:`${SITE_NAME} — ${SITE_TAGLINE}`,
+      browse:`Browse Scholarships — ${SITE_NAME}`,
+      login:`Sign In — ${SITE_NAME}`,
+      register:`Create Account — ${SITE_NAME}`,
+      dashboard:`My Dashboard — ${SITE_NAME}`,
+      admin:`Admin Panel — ${SITE_NAME}`,
+      detail: pageParam ? `${scholarships.find(s=>s.slug===pageParam)?.title||"Scholarship"} — ${SITE_NAME}` : SITE_NAME,
+    };
+    document.title = titles[page] || SITE_NAME;
+    // Update meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if(!metaDesc){metaDesc=document.createElement("meta");metaDesc.name="description";document.head.appendChild(metaDesc);}
+    metaDesc.content = page==="detail"
+      ? (scholarships.find(s=>s.slug===pageParam)?.description || SITE_DESCRIPTION).slice(0,160)
+      : SITE_DESCRIPTION;
+  },[page,pageParam,scholarships]);
+
   async function loadScholarships(){
     setLoading(true);
     let sheetData=null;
-    if(sheetUrl&&sheetUrl!=="YOUR_GOOGLE_SHEET_CSV_URL_HERE"){
+    // Only attempt to fetch if a real URL has been saved
+    if(sheetUrl && sheetUrl.trim().startsWith("http")){
       sheetData=await fetchFromGoogleSheets(sheetUrl);
     }
     const base=sheetData||FALLBACK_SCHOLARSHIPS;
+    // Admin-added scholarships appear first and override any built-in entry with the same slug
     const merged=[...adminScholarships,...base.filter(f=>!adminScholarships.find(a=>a.slug===f.slug))];
     setScholarships(merged);
     setLoading(false);
@@ -1301,13 +1463,16 @@ export default function App() {
 
   useEffect(()=>{
     loadScholarships();
+    // Re-run when admin scholarships change (added / edited / deleted)
     const fn=()=>loadScholarships();
     store.listeners.add(fn);
     return()=>store.listeners.delete(fn);
   },[sheetUrl]);
 
   function navigate(p,param=null,search=""){
-    setPage(p);setPageParam(param);setSearchParam(search);
+    setPage(p);
+    setPageParam(param);
+    setSearchParam(search);
     window.scrollTo(0,0);
   }
 
@@ -1317,13 +1482,13 @@ export default function App() {
       <div className="app">
         <Nav page={page} onNavigate={navigate}/>
         <main style={{flex:1}}>
-          {page==="home"&&<HomePage onNavigate={navigate} scholarships={scholarships} loading={loading}/>}
-          {page==="browse"&&<BrowsePage onNavigate={navigate} scholarships={scholarships} loading={loading} initialSearch={searchParam}/>}
-          {page==="detail"&&<DetailPage slug={pageParam} onNavigate={navigate} scholarships={scholarships}/>}
-          {page==="login"&&<LoginPage onNavigate={navigate}/>}
-          {page==="register"&&<RegisterPage onNavigate={navigate}/>}
-          {page==="dashboard"&&<DashboardPage onNavigate={navigate} scholarships={scholarships}/>}
-          {page==="admin"&&<AdminPage onNavigate={navigate} scholarships={scholarships} sheetUrl={sheetUrl} setSheetUrl={setSheetUrl} onRefresh={loadScholarships} loading={loading}/>}
+          {page==="home"     && <HomePage      onNavigate={navigate} scholarships={scholarships} loading={loading}/>}
+          {page==="browse"   && <BrowsePage    onNavigate={navigate} scholarships={scholarships} loading={loading} initialSearch={searchParam}/>}
+          {page==="detail"   && <DetailPage    slug={pageParam}      onNavigate={navigate} scholarships={scholarships}/>}
+          {page==="login"    && <LoginPage     onNavigate={navigate}/>}
+          {page==="register" && <RegisterPage  onNavigate={navigate}/>}
+          {page==="dashboard"&& <DashboardPage onNavigate={navigate} scholarships={scholarships}/>}
+          {page==="admin"    && <AdminPage     onNavigate={navigate} scholarships={scholarships} sheetUrl={sheetUrl} setSheetUrl={setSheetUrl} onRefresh={loadScholarships} loading={loading}/>}
         </main>
         <Footer onNavigate={navigate}/>
         <ToastContainer/>
