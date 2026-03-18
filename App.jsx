@@ -33,8 +33,8 @@ import { useState, useEffect } from "react";
 const GOOGLE_SHEET_CSV_URL = "";
 
 // Admin access credentials — change BOTH before publishing live
-const ADMIN_EMAIL    = "admin@daniglobalacademy.com";
-const ADMIN_PASSWORD = "DGA@2026!Admin";  // Change this to something unique and strong
+const ADMIN_EMAIL    = "danielasele13@gmail.com";
+const ADMIN_PASSWORD = "Daniase@2113";  // Change this to something unique and strong
 
 // Site metadata used for SEO <title> and <meta> tags
 const SITE_NAME        = "Dani Global Academy";
